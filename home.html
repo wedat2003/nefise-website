@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Home</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <div class="dashboard">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+        <div>
+          <div class="pill">🧭 Tasks</div>
+          <h2 style="margin-top:10px;">Choose</h2>
+          <div class="muted">Everything in one place.</div>
+        </div>
+        <button class="btn" id="lockBtn" title="Lock">🔒</button>
+      </div>
+
+      <div class="taskList">
+        <a class="btn taskBtn" href="events.html">📅 Events</a>
+        <a class="btn taskBtn" href="counters.html">⏳ Counters</a>
+        <a class="btn taskBtn" href="media.html">🖼️ Gallery</a>
+        <a class="btn taskBtn" href="posts.html">📝 Posts</a>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="muted" style="font-weight:950;">Latest event</div>
+      <div id="latestEvent" class="item" style="margin-top:10px;">
+        <div class="muted">No events yet. Create one in “Events”.</div>
+      </div>
+    </div>
+
+    <div style="display:grid; gap:16px;">
+      <div class="card">
+        <h2>✨ Home</h2>
+        <div class="muted">Recent things at a glance.</div>
+
+        <div class="hr"></div>
+
+        <div class="mainGrid">
+          <div>
+            <h3 style="margin:0;">🖼️ Last 3 media</h3>
+            <div class="muted">Photos + videos</div>
+            <div style="height:10px;"></div>
+            <div class="photoRow" id="recentMedia"></div>
+            <div id="noMedia" class="muted" style="margin-top:10px; display:none;">No media yet.</div>
+            <div class="rowBtns">
+              <a class="btn btnPrimary" href="media.html">Open Gallery</a>
+            </div>
+          </div>
+
+          <div>
+            <h3 style="margin:0;">📝 Last 3 posts</h3>
+            <div class="muted">With attachments</div>
+            <div style="height:10px;"></div>
+            <div class="list" id="recentPosts"></div>
+            <div id="noPosts" class="muted" style="margin-top:10px; display:none;">No posts yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
+          <div>
+            <h2 style="margin:0;">⏳ Counters</h2>
+            <div class="muted">Live preview</div>
+          </div>
+          <a class="btn btnPrimary" href="counters.html">Edit</a>
+        </div>
+
+        <div class="hr"></div>
+        <div id="homeCounters" class="list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    requireUnlocked();
+
+    document.getElementById("lockBtn").addEventListener("click", () => {
+      sessionStorage.removeItem("unlocked");
+      window.location.href = "index.html";
+    });
+
+    // Recent media tiles (3)
+    const recentMediaEl = document.getElementById("recentMedia");
+    const noMediaEl = document.getElementById("noMedia");
+
+    function renderRecentMedia(){
+      const media = getAllMedia().slice(0,3);
+      recentMediaEl.innerHTML = "";
+
+      if (!media.length){
+        noMediaEl.style.display = "block";
+        return;
+      }
+      noMediaEl.style.display = "none";
+
+      media.forEach(m => {
+        const tile = document.createElement("div");
+        tile.className = "tile";
+        tile.addEventListener("click", () => openLightbox(m));
+
+        if (m.type === "image"){
+          tile.innerHTML = `<img src="${m.dataUrl}" alt="photo">`;
+        } else {
+          tile.innerHTML = `<video src="${m.dataUrl}" muted playsinline></video>`;
+        }
+        recentMediaEl.appendChild(tile);
+      });
+    }
+
+    // Recent posts (3)
+    const recentPostsEl = document.getElementById("recentPosts");
+    const noPostsEl = document.getElementById("noPosts");
+
+    function renderRecentPosts(){
+      const posts = loadPosts().sort((a,b)=> b.createdAt - a.createdAt).slice(0,3);
+      recentPostsEl.innerHTML = "";
+      if (!posts.length){ noPostsEl.style.display = "block"; return; }
+      noPostsEl.style.display = "none";
+
+      posts.forEach(p => {
+        const el = document.createElement("div");
+        el.className = "item";
+        el.innerHTML = `
+          <div class="itemTitle">${escapeHtml(p.title || "Post")}</div>
+          <div class="itemMeta">${new Date(p.createdAt).toLocaleString()}</div>
+          <div class="itemText">${escapeHtml((p.text||"").slice(0,140))}${(p.text||"").length>140 ? "…" : ""}</div>
+        `;
+        recentPostsEl.appendChild(el);
+      });
+    }
+
+    // Latest event + popup on unlock
+    const latestEventEl = document.getElementById("latestEvent");
+
+    function getLatestEvent(){
+      return getNextUpcomingEvent(); // from app.js
+    }
+
+
+    function renderLatestEvent(){
+      const e = getLatestEvent();
+      if (!e){
+        latestEventEl.innerHTML = `<div class="muted">No events yet. Create one in “Events”.</div>`;
+        return;
+      }
+      latestEventEl.innerHTML = `
+        <div class="itemTitle">${escapeHtml(e.title || "Event")}</div>
+        <div class="itemMeta">Event: ${localDateFromInput(e.eventLocal).toLocaleString()}</div>
+        <div class="itemText">${escapeHtml((e.text||"").slice(0,180))}${(e.text||"").length>180 ? "…" : ""}</div>
+        <div class="rowBtns"><a class="btn btnPrimary" href="events.html">Open Events</a></div>
+      `;
+    }
+
+    function maybePopupEvent(){
+      if (sessionStorage.getItem("justUnlocked") !== "yes") return;
+      sessionStorage.removeItem("justUnlocked");
+
+      const e = getLatestEvent();
+      if (!e) return;
+
+      openModal(`
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+          <h2 style="margin:0;">📅 ${escapeHtml(e.title || "Event")}</h2>
+          <button class="btn" id="closeX">✕</button>
+        </div>
+        <div class="muted" style="margin-top:6px;">Event: ${localDateFromInput(e.eventLocal).toLocaleString()}</div>
+        <div class="hr"></div>
+        <div class="itemText">${escapeHtml(e.text || "")}</div>
+        ${e.media ? (e.media.type === "image"
+          ? `<img class="lightMedia" src="${e.media.dataUrl}" alt="event">`
+          : `<video class="lightMedia" src="${e.media.dataUrl}" controls autoplay playsinline></video>`
+        ) : ""}
+        <div class="rowBtns">
+          <a class="btn btnPrimary" href="events.html">Open Events</a>
+          <button class="btn" id="closeBtn">Close</button>
+        </div>
+      `);
+
+      document.getElementById("closeX").addEventListener("click", closeModal);
+      document.getElementById("closeBtn").addEventListener("click", closeModal);
+    }
+
+    // Counters preview (live)
+    const homeCountersEl = document.getElementById("homeCounters");
+    const timers = [];
+    function clearTimers(){ while(timers.length) clearInterval(timers.pop()); }
+
+    function renderHomeCounters(){
+      clearTimers();
+      const counters = loadCounters();
+      homeCountersEl.innerHTML = "";
+
+      counters.forEach(c => {
+        const target = localDateFromInput(c.targetLocal);
+        const el = document.createElement("div");
+        el.className = "item";
+        el.innerHTML = `
+          <div class="itemTitle">${escapeHtml(c.title)}</div>
+          <div class="itemMeta">${c.mode === "since" ? "Since" : "Until"} ${target.toLocaleString()}</div>
+          <div class="countRow" style="margin-top:10px;">
+            <div class="box"><div class="n" data-k="d">0</div><div class="l">Days</div></div>
+            <div class="box"><div class="n" data-k="h">00</div><div class="l">Hours</div></div>
+            <div class="box"><div class="n" data-k="m">00</div><div class="l">Minutes</div></div>
+            <div class="box"><div class="n" data-k="s">00</div><div class="l">Seconds</div></div>
+          </div>
+        `;
+        homeCountersEl.appendChild(el);
+
+        const d = el.querySelector('[data-k="d"]');
+        const h = el.querySelector('[data-k="h"]');
+        const m = el.querySelector('[data-k="m"]');
+        const s = el.querySelector('[data-k="s"]');
+
+        function tick(){
+          const now = new Date();
+          const diff = (c.mode === "since") ? (now - target) : (target - now);
+          const p = msParts(diff);
+          d.textContent = p.days;
+          h.textContent = pad2(p.hours);
+          m.textContent = pad2(p.minutes);
+          s.textContent = pad2(p.seconds);
+        }
+        tick();
+        timers.push(setInterval(tick, 1000));
+      });
+    }
+
+    renderRecentMedia();
+    renderRecentPosts();
+    renderLatestEvent();
+    renderHomeCounters();
+    maybePopupEvent();
+  </script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>For the love of my life</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <div id="fxOverlay"><canvas id="fxCanvas"></canvas></div>
+
+  <div class="loginWrap">
+    <div class="card hero">
+      <div class="heroGlow"></div>
+
+      <div class="centerStack" style="position:relative; z-index:1;">
+        <div class="pill">✨ A little surprise</div>
+        <h1 style="margin-top:12px;">For the love of my life</h1>
+        <div id="msg" class="muted">Not much left ❤️</div>
+
+        <div class="countRow">
+          <div class="box"><div class="n" id="d">0</div><div class="l">Days</div></div>
+          <div class="box"><div class="n" id="h">00</div><div class="l">Hours</div></div>
+          <div class="box"><div class="n" id="m">00</div><div class="l">Minutes</div></div>
+          <div class="box"><div class="n" id="s">00</div><div class="l">Seconds</div></div>
+        </div>
+
+        <!-- ADMIN ONLY before time -->
+        <div class="loginControls">
+          <div class="hr"></div>
+          <button class="btn btnPrimary" id="adminBtn" style="width:100%;">log in with admin</button>
+          <div class="muted" style="margin-top:10px;">(Not your time yet askim)</div>
+        </div>
+
+        <!-- PASSWORD only after time -->
+        <div id="loginBox" class="loginControls" style="display:none;">
+          <div class="hr"></div>
+          <h2 style="margin:0 0 8px;">It’s time 😄</h2>
+          <div class="muted">When did I confess?</div>
+
+          <div style="height:12px;"></div>
+          <input id="pw" type="password" placeholder="DD.MM.YYYY" />
+          <button class="btn btnPrimary" id="go" style="margin-top:10px; width:100%;">Unlock</button>
+          <div class="error" id="err">Wrong password 😅</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    const UNLOCK_AT = new Date("2026-03-21T19:20:00");
+    const CORRECT_PW = "21.09.2025";
+    const ADMIN_PW = "Rena2015"; // change this
+
+    const dEl = document.getElementById("d");
+    const hEl = document.getElementById("h");
+    const mEl = document.getElementById("m");
+    const sEl = document.getElementById("s");
+    const msgEl = document.getElementById("msg");
+    const loginBox = document.getElementById("loginBox");
+    const pw = document.getElementById("pw");
+    const go = document.getElementById("go");
+    const err = document.getElementById("err");
+
+    function finishUnlock(){
+      sessionStorage.setItem("unlocked", "yes");
+      sessionStorage.setItem("justUnlocked", "yes");
+      runPixelHeartFX({durationMs: 2400});
+      setTimeout(() => window.location.href = "home.html", 2500);
+    }
+
+    function updateCountdown(){
+      const now = new Date();
+      const diff = UNLOCK_AT - now;
+
+      if (diff <= 0) {
+        msgEl.textContent = "It’s time ❤️";
+        loginBox.style.display = "block";
+        return;
+      }
+
+      const p = msParts(diff);
+      dEl.textContent = p.days;
+      hEl.textContent = pad2(p.hours);
+      mEl.textContent = pad2(p.minutes);
+      sEl.textContent = pad2(p.seconds);
+    }
+
+    setInterval(updateCountdown, 1000);
+    updateCountdown();
+
+    document.getElementById("adminBtn").addEventListener("click", () => {
+      const input = prompt("Admin password:");
+      if (input === null) return;
+      if (input.trim() === ADMIN_PW) finishUnlock();
+      else alert("Wrong admin password");
+    });
+
+    go?.addEventListener("click", () => {
+      if (new Date() < UNLOCK_AT) return;
+      if (pw.value.trim() === CORRECT_PW) finishUnlock();
+      else err.style.display = "block";
+    });
+
+    pw?.addEventListener("input", () => err.style.display = "none");
+    pw?.addEventListener("keydown", (e) => { if (e.key === "Enter") go.click(); });
+  </script>
+</body>
+</html>

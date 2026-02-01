@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Counters</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <div class="card" style="max-width:980px; margin:0 auto;">
+    <div style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
+      <div>
+        <div class="pill">⏳ Counters</div>
+        <h1 style="margin-top:10px;">Counters</h1>
+        <div class="muted">Live counting + add with a button.</div>
+      </div>
+      <div class="rowBtns">
+        <a class="btn" href="home.html">⬅ Home</a>
+        <button class="btn btnPrimary" id="addOpen">➕ Add Counter</button>
+      </div>
+    </div>
+
+    <div class="hr"></div>
+
+    <h2>All counters (live)</h2>
+    <div class="list" id="feed"></div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    requireUnlocked();
+
+    const feedEl = document.getElementById("feed");
+    const addOpen = document.getElementById("addOpen");
+    const timers = [];
+
+    function clearTimers(){ while(timers.length) clearInterval(timers.pop()); }
+
+    function render(){
+      clearTimers();
+      const counters = loadCounters();
+      feedEl.innerHTML = "";
+
+      if (!counters.length){
+        feedEl.innerHTML = `<div class="muted">No counters yet.</div>`;
+        return;
+      }
+
+      counters.forEach((c, idx) => {
+        const target = localDateFromInput(c.targetLocal);
+
+        const el = document.createElement("div");
+        el.className = "item";
+        el.innerHTML = `
+          <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
+            <div>
+              <div class="itemTitle">${escapeHtml(c.title)}</div>
+              <div class="itemMeta">${c.mode === "since" ? "Since" : "Until"} ${target.toLocaleString()}</div>
+            </div>
+            <button class="btn" data-del="${idx}">🗑</button>
+          </div>
+
+          <div class="countRow" style="margin-top:10px;">
+            <div class="box"><div class="n" data-k="d">0</div><div class="l">Days</div></div>
+            <div class="box"><div class="n" data-k="h">00</div><div class="l">Hours</div></div>
+            <div class="box"><div class="n" data-k="m">00</div><div class="l">Minutes</div></div>
+            <div class="box"><div class="n" data-k="s">00</div><div class="l">Seconds</div></div>
+          </div>
+        `;
+        feedEl.appendChild(el);
+
+        const d = el.querySelector('[data-k="d"]');
+        const h = el.querySelector('[data-k="h"]');
+        const m = el.querySelector('[data-k="m"]');
+        const s = el.querySelector('[data-k="s"]');
+
+        function tick(){
+          const now = new Date();
+          const diff = (c.mode === "since") ? (now - target) : (target - now);
+          const p = msParts(diff);
+          d.textContent = p.days;
+          h.textContent = pad2(p.hours);
+          m.textContent = pad2(p.minutes);
+          s.textContent = pad2(p.seconds);
+        }
+        tick();
+        timers.push(setInterval(tick, 1000));
+      });
+
+      feedEl.querySelectorAll("[data-del]").forEach(b => {
+        b.addEventListener("click", () => {
+          const counters = loadCounters();
+          const idx = Number(b.getAttribute("data-del"));
+          counters.splice(idx, 1);
+          saveCounters(counters);
+          render();
+        });
+      });
+    }
+
+    function openAddCounterModal(){
+      const { inner } = openModal(`
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+          <h2 style="margin:0;">➕ Add Counter</h2>
+          <button class="btn" id="closeX">✕</button>
+        </div>
+        <div class="hr"></div>
+
+        <input id="title" placeholder="Title" />
+        <div style="height:10px;"></div>
+
+        <select id="mode">
+          <option value="since">Since (count up)</option>
+          <option value="until">Until (countdown)</option>
+        </select>
+
+        <div style="height:10px;"></div>
+        <input id="dt" type="datetime-local" />
+
+        <div class="rowBtns">
+          <button class="btn btnPrimary" id="save">Save</button>
+          <button class="btn" id="cancel">Cancel</button>
+        </div>
+        <div class="error" id="err">Please fill all fields.</div>
+      `);
+
+      inner.querySelector("#closeX").addEventListener("click", closeModal);
+      inner.querySelector("#cancel").addEventListener("click", closeModal);
+
+      const titleEl = inner.querySelector("#title");
+      const modeEl  = inner.querySelector("#mode");
+      const dtEl    = inner.querySelector("#dt");
+      const errEl   = inner.querySelector("#err");
+
+      inner.querySelector("#save").addEventListener("click", () => {
+        const title = titleEl.value.trim();
+        const mode = modeEl.value;
+        const dt = dtEl.value;
+        if (!title || !dt){ errEl.style.display="block"; return; }
+        errEl.style.display="none";
+
+        const counters = loadCounters();
+        counters.push({ title, mode, targetLocal: dt });
+        saveCounters(counters);
+
+        closeModal();
+        render();
+      });
+    }
+
+    addOpen.addEventListener("click", openAddCounterModal);
+    render();
+  </script>
+</body>
+</html>

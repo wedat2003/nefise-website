@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Posts</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <div class="card" style="max-width:980px; margin:0 auto;">
+    <div style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
+      <div>
+        <div class="pill">📝 Posts</div>
+        <h1 style="margin-top:10px;">Posts</h1>
+        <div class="muted">Add text + optional image/video.</div>
+      </div>
+      <div class="rowBtns">
+        <a class="btn" href="home.html">⬅ Home</a>
+        <button class="btn btnPrimary" id="addOpen">➕ Add Post</button>
+        <button class="btn" id="clearAll">🗑 Clear</button>
+      </div>
+    </div>
+
+    <div class="hr"></div>
+
+    <h2>Feed</h2>
+    <div class="list" id="feed"></div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    requireUnlocked();
+
+    const feedEl = document.getElementById("feed");
+    const addOpen = document.getElementById("addOpen");
+    const clearAll = document.getElementById("clearAll");
+
+    function render(){
+      const posts = loadPosts().sort((a,b)=> b.createdAt - a.createdAt);
+      feedEl.innerHTML = "";
+
+      if (!posts.length){
+        feedEl.innerHTML = `<div class="muted">No posts yet.</div>`;
+        return;
+      }
+
+      posts.forEach((p, idx) => {
+        const el = document.createElement("div");
+        el.className = "item";
+        el.innerHTML = `
+          <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
+            <div style="min-width:0;">
+              <div class="itemTitle">${escapeHtml(p.title || "Post")}</div>
+              <div class="itemMeta">${new Date(p.createdAt).toLocaleString()}</div>
+            </div>
+            <button class="btn" data-del="${idx}">🗑</button>
+          </div>
+          <div class="itemText">${escapeHtml(p.text || "")}</div>
+          ${mediaHTML(p.media)}
+        `;
+        feedEl.appendChild(el);
+      });
+
+      feedEl.querySelectorAll("[data-del]").forEach(b => {
+        b.addEventListener("click", () => {
+          const posts = loadPosts().sort((a,b)=> b.createdAt - a.createdAt);
+          const idx = Number(b.getAttribute("data-del"));
+          posts.splice(idx, 1);
+          savePosts(posts);
+          render();
+        });
+      });
+    }
+
+    function openAddPostModal(){
+      const { inner } = openModal(`
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+          <h2 style="margin:0;">➕ Add Post</h2>
+          <button class="btn" id="closeX">✕</button>
+        </div>
+        <div class="hr"></div>
+
+        <input id="title" placeholder="Title (optional)" />
+        <div style="height:10px;"></div>
+        <textarea id="text" placeholder="Write something..."></textarea>
+
+        <div style="height:10px;"></div>
+        <label class="muted" style="font-weight:900;">Attachment (optional)</label>
+        <input id="file" type="file" accept="image/*,video/*" />
+        <div id="prev"></div>
+
+        <div class="rowBtns">
+          <button class="btn btnPrimary" id="save">Save</button>
+          <button class="btn" id="cancel">Cancel</button>
+        </div>
+        <div class="error" id="err">Please write something first 🙂</div>
+      `);
+
+      inner.querySelector("#closeX").addEventListener("click", closeModal);
+      inner.querySelector("#cancel").addEventListener("click", closeModal);
+
+      const titleEl = inner.querySelector("#title");
+      const textEl  = inner.querySelector("#text");
+      const fileEl  = inner.querySelector("#file");
+      const prevEl  = inner.querySelector("#prev");
+      const errEl   = inner.querySelector("#err");
+
+      let pendingMedia = null;
+
+      fileEl.addEventListener("change", async () => {
+        const f = fileEl.files && fileEl.files[0];
+        pendingMedia = null;
+        prevEl.innerHTML = "";
+        if (!f) return;
+
+        const dataUrl = await fileToDataURL(f);
+        const type = f.type.startsWith("video") ? "video" : "image";
+        pendingMedia = { type, dataUrl, name: f.name };
+        prevEl.innerHTML = mediaHTML(pendingMedia);
+      });
+
+      inner.querySelector("#save").addEventListener("click", () => {
+        const title = titleEl.value.trim();
+        const text = textEl.value.trim();
+        if (!text){ errEl.style.display="block"; return; }
+        errEl.style.display="none";
+
+        const posts = loadPosts();
+        posts.push({ title, text, createdAt: Date.now(), media: pendingMedia });
+        savePosts(posts);
+
+        closeModal();
+        render();
+      });
+    }
+
+    addOpen.addEventListener("click", openAddPostModal);
+    clearAll.addEventListener("click", () => { savePosts([]); render(); });
+    render();
+  </script>
+</body>
+</html>
